@@ -1,0 +1,2231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Image Picker</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap');
+
+  :root{
+    --lav-50:  #F8F6FD;
+    --lav-100: #EFEAFA;
+    --lav-200: #DFD4F5;
+    --purple-500: #7C4FE0;
+    --purple-600: #6636C9;
+    --purple-700: #4E2699;
+    --ink: #2B2140;
+    --ink-soft: #6C6285;
+    --white: #FFFFFF;
+    --radius-card: 12px;
+    --shadow-lift: 0 10px 22px -12px rgba(102, 54, 201, 0.4);
+  }
+
+  *{ box-sizing: border-box; }
+
+  [hidden]{ display:none !important; }
+
+  /* ---------------- Loading screen ---------------- */
+  .loader{
+    position:fixed;
+    inset:0;
+    z-index:9999;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    background:
+      radial-gradient(circle at 12% -10%, var(--lav-100), transparent 55%),
+      radial-gradient(circle at 100% 0%, var(--lav-200), transparent 45%),
+      var(--white);
+    transition: opacity .5s ease, visibility .5s ease;
+  }
+
+  .loader.hide{
+    opacity:0;
+    visibility:hidden;
+    pointer-events:none;
+  }
+
+  .loader-inner{ text-align:center; }
+
+  .loader-brand{
+    font-family:'Space Grotesk', sans-serif;
+    font-size: clamp(30px, 6vw, 44px);
+    font-weight:700;
+    background: linear-gradient(135deg, var(--purple-500), var(--purple-700));
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: transparent;
+    margin-bottom: 18px;
+  }
+
+  .loader-reel{
+    width: 96px;
+    height: 64px;
+    margin: 0 auto 16px;
+    border: 2px solid var(--lav-200);
+    border-radius: 12px;
+    background: #fff;
+    box-shadow: inset 0 0 0 6px var(--lav-50), var(--shadow-lift);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .loader-reel::before, .loader-reel::after{
+    content:"";
+    position:absolute;
+    left:0; right:0;
+    height:14px;
+    z-index:2;
+    pointer-events:none;
+  }
+
+  .loader-reel::before{ top:0; background: linear-gradient(to bottom, var(--lav-50), transparent); }
+  .loader-reel::after{ bottom:0; background: linear-gradient(to top, var(--lav-50), transparent); }
+
+  .loader-slot{
+    position:absolute;
+    inset:0;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-family:'Space Grotesk', sans-serif;
+    font-size:34px;
+    font-weight:700;
+    color: var(--purple-600);
+    will-change: transform;
+  }
+
+  .loader-bar{
+    width: 180px;
+    height: 6px;
+    margin: 0 auto 12px;
+    background: var(--lav-100);
+    border-radius: 100px;
+    overflow: hidden;
+  }
+
+  .loader-barfill{
+    height:100%;
+    width:0;
+    background: linear-gradient(90deg, var(--purple-500), var(--purple-700));
+    border-radius: 100px;
+    animation: loaderBar .9s ease-out forwards;
+  }
+
+  @keyframes loaderBar{
+    0%{ width: 0; }
+    100%{ width: 100%; }
+  }
+
+  .loader-tag{
+    color: var(--ink-soft);
+    font-size: 12.5px;
+    letter-spacing: .04em;
+  }
+
+  html, body{
+    height:100%;
+    margin:0;
+  }
+
+  body{
+    overflow:hidden;
+    background:
+      radial-gradient(circle at 12% -10%, var(--lav-100), transparent 55%),
+      radial-gradient(circle at 100% 0%, var(--lav-200), transparent 45%),
+      var(--white);
+    font-family: 'Inter', sans-serif;
+    color: var(--ink);
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    padding: 1.4vh 2vw;
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    *{ animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+  }
+
+  /* ---------------- Screens (setup / entry / game) ---------------- */
+  .screen{ display:none; width:100%; flex:1 1 auto; min-height:0; }
+  .screen.active{ display:flex; flex-direction:column; align-items:center; }
+  .screen.scroll{ overflow-y:auto; }
+
+  #setupScreen{ overflow:hidden; }
+  #setupScreen.active{ justify-content:center; }
+  #gameScreen.active{ overflow:hidden; }
+
+  /* ---------------- Landing: How it works + Set up the board ---------------- */
+  .landing{
+    display:flex;
+    flex-direction:row;
+    gap:18px;
+    width:min(94vw, 980px);
+    align-items:stretch;
+    margin: 1vh 0;
+    transform-origin: center center;
+  }
+
+  .landing-card{
+    background: var(--white);
+    border: 1px solid var(--lav-200);
+    border-radius: 18px;
+    box-shadow: var(--shadow-lift);
+    padding: 18px 24px;
+  }
+
+  .info-card{
+    text-align:left;
+    flex: 0 1 42%;
+    min-width:0;
+  }
+
+  .app-title{
+    font-family:'Space Grotesk', sans-serif;
+    font-size: 24px;
+    margin: 0 0 2px;
+    background: linear-gradient(135deg, var(--purple-500), var(--purple-700));
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: transparent;
+  }
+
+  .info-sub{
+    color: var(--ink-soft);
+    font-size: 12.5px;
+    margin: 0 0 12px;
+    line-height:1.4;
+  }
+
+  .about-text{
+    margin: 0 0 8px;
+    color: var(--ink-soft);
+    font-size: 13px;
+    line-height: 1.45;
+  }
+
+  .uses{
+    margin: 0 0 10px;
+    padding: 0;
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+  }
+
+  .uses li{
+    position: relative;
+    padding-left: 24px;
+    color: var(--ink-soft);
+    font-size: 12.5px;
+    line-height: 1.35;
+  }
+
+  .uses li::before{
+    content: "✓";
+    position: absolute;
+    left: 0;
+    top: 0;
+    color: var(--purple-600);
+    font-weight: 700;
+  }
+
+  .info-heading{
+    font-family:'Space Grotesk', sans-serif;
+    font-size: 15px;
+    margin: 0 0 7px;
+    color: var(--ink);
+  }
+
+  .steps{
+    margin:0;
+    padding-left:0;
+    list-style:none;
+    counter-reset: step;
+  }
+
+  .steps li{
+    position:relative;
+    counter-increment: step;
+    padding: 0 0 7px 34px;
+    color: var(--ink-soft);
+    font-size: 12.5px;
+    line-height: 1.4;
+  }
+
+  .steps li::before{
+    content: counter(step);
+    position:absolute;
+    left:0;
+    top:0;
+    width:22px;
+    height:22px;
+    border-radius:50%;
+    background: var(--lav-100);
+    color: var(--purple-600);
+    font-size:12px;
+    font-weight:700;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+  }
+
+  .steps li b{
+    color: var(--ink);
+  }
+
+  .dev-info{
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px dashed var(--lav-200);
+  }
+
+  .dev-label{
+    display:block;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    margin-bottom: 4px;
+  }
+
+  .dev-mail{
+    color: var(--purple-600);
+    font-size: 13px;
+    font-weight: 600;
+    text-decoration: none;
+    word-break: break-all;
+  }
+
+  .dev-mail:hover{ text-decoration: underline; }
+
+  .setup-card{
+    background: var(--white);
+    border: 1px solid var(--lav-200);
+    border-radius: 18px;
+    box-shadow: var(--shadow-lift);
+    padding: 16px 24px;
+    width:auto;
+    flex: 1 1 58%;
+    min-width:0;
+    text-align:center;
+  }
+
+  @media (max-width: 820px){
+    .landing{
+      flex-direction:column;
+      width:min(94vw, 400px);
+    }
+    .info-card, .setup-card{
+      flex: 1 1 auto;
+      width:100%;
+    }
+    .steps li{ font-size:12.5px; }
+  }
+
+  .setup-card h1{
+    font-family:'Space Grotesk', sans-serif;
+    font-size: 23px;
+    margin: 0 0 3px;
+    color: var(--ink);
+  }
+
+  .setup-card .sub{
+    margin: 0 0 12px;
+    color: var(--ink-soft);
+    font-size: 12.5px;
+    line-height:1.4;
+  }
+
+  .field-label{
+    font-weight:600;
+    font-size:12.5px;
+    color: var(--ink-soft);
+    margin: 11px 0 6px;
+  }
+
+  .num-input{
+    width:130px;
+    padding:10px 12px;
+    font-size:22px;
+    font-family:'Space Grotesk', sans-serif;
+    text-align:center;
+    color: var(--ink);
+    border:2px solid var(--lav-200);
+    border-radius:12px;
+    background:#fff;
+  }
+
+  .num-input:focus{ outline:none; border-color: var(--purple-500); box-shadow: 0 0 0 3px rgba(124,79,224,0.15); }
+
+  .hint{ margin: 6px 0 0; color: var(--ink-soft); font-size:12px; font-variant-numeric: tabular-nums; }
+
+  .mode-options{ display:flex; flex-direction:column; gap:7px; margin-top:2px; }
+
+  .mode-option{
+    border:2px solid var(--lav-200);
+    background: var(--white);
+    color: var(--ink-soft);
+    border-radius:12px;
+    padding:10px 14px;
+    font-family:'Inter', sans-serif;
+    font-size:13.5px;
+    font-weight:600;
+    cursor:pointer;
+    text-align:left;
+    transition: border-color .18s ease, background .18s ease, color .18s ease;
+  }
+
+  .mode-option small{ display:block; font-weight:500; font-size:11.5px; color: var(--ink-soft); margin-top:2px; opacity:.85; }
+  .mode-option:hover{ border-color: var(--purple-500); }
+  .mode-option.selected{ border-color: var(--purple-600); background: var(--lav-50); color: var(--purple-700); box-shadow: 0 8px 18px -10px rgba(102,54,201,.45); }
+
+  .setup-btn{
+    width:100%;
+    margin-top:14px;
+    border:none;
+    background: linear-gradient(135deg, var(--purple-500), var(--purple-700));
+    color: var(--white);
+    font-family:'Inter', sans-serif;
+    font-size:14.5px;
+    font-weight:600;
+    padding:11px 18px;
+    border-radius:100px;
+    cursor:pointer;
+    box-shadow: var(--shadow-lift);
+    transition: transform .15s ease, box-shadow .2s ease;
+  }
+
+  .setup-btn:hover{ transform: translateY(-1px); box-shadow: 0 16px 28px -12px rgba(102,54,201,.6); }
+
+  /* ---------------- Entry screen ---------------- */
+  .entry-head{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:12px;
+    width:100%;
+    max-width:980px;
+    padding-bottom:12px;
+    border-bottom:1px solid var(--lav-200);
+  }
+
+  .entry-title{ font-family:'Space Grotesk', sans-serif; font-weight:700; font-size:clamp(15px,2vh,19px); color:var(--ink); }
+
+  .ghost-btn{
+    border:1px solid var(--lav-200);
+    background: var(--white);
+    color: var(--ink-soft);
+    font-family:'Inter', sans-serif;
+    font-size:12.5px;
+    font-weight:600;
+    padding:9px 16px;
+    border-radius:100px;
+    cursor:pointer;
+    transition: border-color .18s ease, color .18s ease;
+  }
+
+  .ghost-btn:hover{ border-color: var(--purple-500); color: var(--purple-700); }
+
+  .entry-grid{
+    display:grid;
+    grid-template-columns: repeat(auto-fill, minmax(215px, 1fr));
+    gap:12px;
+    width:100%;
+    max-width:980px;
+    padding:14px 0 20px;
+  }
+
+  .entry-slot{
+    background: var(--white);
+    border:1px solid var(--lav-200);
+    border-radius:14px;
+    padding:10px;
+    display:flex;
+    flex-direction:column;
+    gap:8px;
+  }
+
+  .entry-num{
+    font-family:'Space Grotesk', sans-serif;
+    font-weight:700;
+    font-size:14px;
+    color: var(--purple-700);
+  }
+
+  .entry-photo{ display:block; }
+
+  .entry-photo-box{
+    aspect-ratio: 1 / 1;
+    border-radius:10px;
+    background: var(--lav-50);
+    border:1.5px dashed var(--lav-200);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    cursor:pointer;
+    overflow:hidden;
+    text-align:center;
+    color: var(--ink-soft);
+    font-size:12.5px;
+    font-weight:500;
+    transition: border-color .18s ease, background .18s ease;
+  }
+
+  .entry-photo-box:hover{ border-color: var(--purple-500); background: #FCFAFF; }
+  .entry-photo-box img{ width:100%; height:100%; object-fit:cover; display:block; }
+
+  .entry-name{
+    width:100%;
+    padding:9px 11px;
+    font-size:14px;
+    font-family:'Inter', sans-serif;
+    color: var(--ink);
+    border:1px solid var(--lav-200);
+    border-radius:10px;
+    background:#fff;
+  }
+
+  .entry-name:focus{ outline:none; border-color: var(--purple-500); box-shadow: 0 0 0 3px rgba(124,79,224,.14); }
+
+  .bulk-bar{
+    width:100%;
+    max-width:980px;
+    display:flex;
+    flex-wrap:wrap;
+    align-items:center;
+    justify-content:space-between;
+    gap:10px 14px;
+    background: var(--lav-50);
+    border:1px solid var(--lav-200);
+    border-radius:14px;
+    padding:13px 16px;
+    margin-top:12px;
+  }
+
+  .bulk-title{ font-family:'Space Grotesk', sans-serif; font-weight:700; font-size:14.5px; color: var(--purple-700); }
+  .bulk-sub{ font-size:12px; color: var(--ink-soft); margin-top:2px; line-height:1.35; }
+
+  .bulk-actions{ display:flex; gap:8px; flex-wrap:wrap; }
+  .bulk-file-btn{ display:inline-block; cursor:pointer; }
+
+  /* ---------------- Original game layout ---------------- */
+  header{
+    text-align:center;
+    max-width: 620px;
+    flex-shrink:0;
+  }
+
+  header h1{
+    font-family:'Space Grotesk', sans-serif;
+    font-size: clamp(18px, 2.6vh, 28px);
+    font-weight: 700;
+    margin: 0 0 2px;
+    letter-spacing: -0.01em;
+  }
+
+  header p{
+    margin:0;
+    color: var(--ink-soft);
+    font-size: clamp(11px, 1.4vh, 14px);
+    line-height:1.4;
+  }
+
+  .progress-row{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:10px;
+    margin-top: 0.8vh;
+  }
+
+  .progress-track{
+    width: 140px;
+    height: 6px;
+    border-radius: 20px;
+    background: var(--lav-100);
+    overflow:hidden;
+  }
+
+  .progress-fill{
+    height:100%;
+    background: linear-gradient(90deg, var(--purple-500), var(--purple-700));
+    border-radius: 20px;
+    transition: width 0.45s cubic-bezier(.4,0,.2,1);
+    width:0%;
+  }
+
+  .progress-label{
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--purple-700);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .board{
+    flex: 1 1 auto;
+    display:grid;
+    grid-template-columns: repeat(10, 1fr);
+    grid-template-rows: repeat(6, 1fr);
+    gap: 0.9vh 0.7vw;
+    width: 100%;
+    max-width: 1400px;
+    min-height: 0;
+    margin: 1vh 0;
+  }
+
+  .cell{
+    perspective: 1000px;
+    min-height:0;
+    min-width:0;
+  }
+
+  .card{
+    position:relative;
+    width:100%;
+    height:100%;
+    cursor:pointer;
+    transform-style: preserve-3d;
+    transition: transform 0.5s cubic-bezier(.34,1.56,.64,1);
+  }
+
+  .card:focus-visible{
+    outline: 2px solid var(--purple-500);
+    outline-offset: 2px;
+    border-radius: var(--radius-card);
+  }
+
+  .card.flipped{
+    transform: rotateY(180deg);
+  }
+
+  .face{
+    position:absolute;
+    inset:0;
+    backface-visibility:hidden;
+    border-radius: var(--radius-card);
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    box-shadow: var(--shadow-lift);
+    overflow:hidden;
+  }
+
+  .face-front{
+    background: linear-gradient(155deg, var(--white) 0%, var(--lav-50) 100%);
+    border: 1px solid var(--lav-200);
+  }
+
+  .face-front .num{
+    font-family:'Space Grotesk', sans-serif;
+    font-size: clamp(13px, 2.6vh, 22px);
+    font-weight: 700;
+    color: var(--purple-700);
+  }
+
+  /* ---- back face: image fills the ENTIRE card ---- */
+  .face-back{
+    transform: rotateY(180deg);
+    background: linear-gradient(165deg, var(--purple-600), var(--purple-700));
+  }
+
+  .face-back .photo-fill{
+    position:absolute;
+    inset:0;
+    width:100%;
+    height:100%;
+    object-fit: cover;
+    display:block;
+  }
+
+  .face-back .initials-fill{
+    position:absolute;
+    inset:0;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-family:'Space Grotesk', sans-serif;
+    font-weight:700;
+    font-size: clamp(16px, 3.2vh, 30px);
+    color:#fff;
+  }
+
+  .face-back .caption{
+    position:absolute;
+    left:0; right:0; bottom:0;
+    padding: 10% 6% 6%;
+    background: linear-gradient(to top, rgba(20,10,40,0.82), rgba(20,10,40,0));
+    color:#fff;
+    text-align:center;
+  }
+
+  .face-back .caption .name{
+    font-weight:600;
+    font-size: clamp(7.5px, 1.1vh, 11px);
+    line-height:1.2;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+
+  .face-back .caption .num-tag{
+    font-size: clamp(6.5px, 0.9vh, 9px);
+    color: rgba(255,255,255,0.75);
+    margin-top:1px;
+  }
+
+  footer{
+    flex-shrink:0;
+  }
+
+  .reset-btn{
+    border: 1px solid var(--lav-200);
+    background: var(--white);
+    color: var(--ink-soft);
+    font-family:'Inter', sans-serif;
+    font-size: clamp(11px, 1.4vh, 13.5px);
+    font-weight: 500;
+    padding: 0.8vh 18px;
+    border-radius: 100px;
+    cursor:pointer;
+    transition: border-color 0.2s ease, color 0.2s ease;
+  }
+
+  .reset-btn:hover{
+    border-color: var(--purple-500);
+    color: var(--purple-700);
+  }
+
+  .footer-row{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:10px;
+    flex-wrap:wrap;
+  }
+
+  .spin-btn{
+    border: none;
+    background: linear-gradient(135deg, var(--purple-500), var(--purple-700));
+    color: var(--white);
+    font-family:'Inter', sans-serif;
+    font-size: clamp(11px, 1.4vh, 13.5px);
+    font-weight: 600;
+    padding: 0.8vh 18px;
+    border-radius: 100px;
+    cursor:pointer;
+    display:flex;
+    align-items:center;
+    gap:6px;
+    box-shadow: var(--shadow-lift);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+  }
+
+  .spin-btn:hover{
+    transform: translateY(-1px);
+    box-shadow: 0 14px 26px -12px rgba(102, 54, 201, 0.55);
+  }
+
+  .spin-btn:disabled{
+    opacity:0.5;
+    cursor:not-allowed;
+    transform:none;
+    box-shadow:none;
+  }
+
+  .spin-btn .spin-icon{
+    display:inline-block;
+    transition: transform 0.6s cubic-bezier(.34,1.56,.64,1);
+  }
+
+  .spin-btn.spinning .spin-icon{
+    transform: rotate(360deg);
+  }
+
+  /* ---------------- Spin wheel (slot reel) overlay ---------------- */
+  .spin-overlay{
+    position:fixed;
+    inset:0;
+    background: rgba(43,33,64,0.62);
+    backdrop-filter: blur(6px);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    z-index:2000;
+    opacity:0;
+    pointer-events:none;
+    transition: opacity 0.25s ease;
+  }
+
+  .spin-overlay.open{
+    opacity:1;
+    pointer-events:auto;
+  }
+
+  .spin-modal{
+    background: var(--white);
+    border-radius: 24px;
+    padding: 26px 30px 22px;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    box-shadow: 0 30px 60px -20px rgba(43,33,64,0.5);
+    width: min(88vw, 300px);
+    transform: scale(0.85);
+    opacity:0;
+    transition: transform 0.4s cubic-bezier(.34,1.56,.64,1), opacity 0.3s ease;
+  }
+
+  .spin-overlay.open .spin-modal{
+    transform: scale(1);
+    opacity:1;
+  }
+
+  .spin-modal-title{
+    margin-top: 14px;
+    font-family:'Space Grotesk', sans-serif;
+    font-weight: 700;
+    font-size: clamp(13px, 1.8vh, 16px);
+    color: var(--purple-700);
+    letter-spacing: -0.01em;
+  }
+
+  .spin-window{
+    position:relative;
+    width:100%;
+    height: 228px; /* 3 * item height */
+    overflow:hidden;
+    border-radius: 16px;
+    background: var(--lav-50);
+    border: 1px solid var(--lav-200);
+  }
+
+  .spin-marker{
+    position:absolute;
+    top:50%;
+    left:0;
+    right:0;
+    height:76px;
+    transform: translateY(-50%);
+    border-top: 2px solid var(--purple-500);
+    border-bottom: 2px solid var(--purple-500);
+    background: rgba(124,79,224,0.08);
+    pointer-events:none;
+    z-index:2;
+  }
+
+  .spin-fade{
+    position:absolute;
+    left:0;
+    right:0;
+    height:34px;
+    z-index:3;
+    pointer-events:none;
+  }
+
+  .spin-fade.top{
+    top:0;
+    background: linear-gradient(to bottom, var(--lav-50), rgba(248,246,253,0));
+  }
+
+  .spin-fade.bottom{
+    bottom:0;
+    background: linear-gradient(to top, var(--lav-50), rgba(248,246,253,0));
+  }
+
+  .spin-reel{
+    display:flex;
+    flex-direction:column;
+    will-change: transform;
+  }
+
+  .spin-item{
+    height:76px;
+    display:flex;
+    flex-direction:row;
+    align-items:center;
+    justify-content:center;
+    gap:10px;
+    font-family:'Space Grotesk', sans-serif;
+    font-weight:700;
+    font-size: 24px;
+    color: var(--ink-soft);
+    opacity:0.45;
+    transition: opacity 0.25s ease, color 0.25s ease, transform 0.25s ease;
+  }
+
+  .spin-item .spin-photo{
+    width:44px;
+    height:44px;
+    border-radius:10px;
+    object-fit:cover;
+    flex-shrink:0;
+    box-shadow: 0 4px 12px -5px rgba(43,33,64,.45);
+  }
+
+  .spin-item .spin-initials{
+    width:44px;
+    height:44px;
+    border-radius:10px;
+    background: linear-gradient(165deg, var(--purple-600), var(--purple-700));
+    color:#fff;
+    font-size:15px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    flex-shrink:0;
+  }
+
+  .spin-item.winner{
+    color: var(--purple-700);
+    opacity:1;
+    transform: scale(1.1);
+  }
+
+  @media (max-width: 700px){
+    .board{
+      grid-template-columns: repeat(6, 1fr);
+      grid-template-rows: repeat(10, 1fr);
+    }
+  }
+
+  /* ---------------- Enlarged image overlay ---------------- */
+  .overlay{
+    position:fixed;
+    inset:0;
+    background: rgba(43,33,64,0.58);
+    backdrop-filter: blur(6px);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    z-index:1000;
+    opacity:0;
+    pointer-events:none;
+    transition: opacity 0.25s ease;
+  }
+
+  .overlay.open{
+    opacity:1;
+    pointer-events:auto;
+  }
+
+  .overlay-card{
+    perspective: 2000px;
+    width: min(88vw, 460px);
+  }
+
+  .overlay-inner{
+    background: var(--white);
+    border-radius: 24px;
+    padding: 18px;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    box-shadow: 0 30px 60px -20px rgba(43,33,64,0.5);
+    transform: rotateY(-100deg) scale(0.85);
+    opacity:0;
+    transition: transform 0.5s cubic-bezier(.34,1.56,.64,1), opacity 0.35s ease;
+  }
+
+  .overlay.open .overlay-inner{
+    transform: rotateY(0deg) scale(1);
+    opacity:1;
+  }
+
+  .overlay-photo-wrap{
+    width:100%;
+    aspect-ratio: 1 / 1;
+    border-radius: 16px;
+    overflow:hidden;
+    background: linear-gradient(165deg, var(--purple-600), var(--purple-700));
+    display:flex;
+    align-items:center;
+    justify-content:center;
+  }
+
+  .overlay-photo-wrap img{
+    width:100%;
+    height:100%;
+    object-fit: cover;
+  }
+
+  .overlay-photo-wrap .overlay-initials{
+    color:#fff;
+    font-family:'Space Grotesk', sans-serif;
+    font-weight:700;
+    font-size: clamp(24px, 6.5vw, 44px);
+    line-height: 1.15;
+    text-align:center;
+    padding: 12px;
+    word-break: break-word;
+  }
+
+  .overlay-name{
+    margin-top: 14px;
+    font-family:'Space Grotesk', sans-serif;
+    font-size: 26px;
+    font-weight: 700;
+    text-align:center;
+  }
+
+  .overlay-num{
+    margin-top: 2px;
+    font-size: 13px;
+    color: var(--ink-soft);
+  }
+
+  .tick-btn{
+    margin-top: 16px;
+    width: 46px;
+    height: 46px;
+    border-radius: 50%;
+    border: none;
+    background: linear-gradient(135deg, var(--purple-500), var(--purple-700));
+    color: #fff;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    cursor:pointer;
+    box-shadow: 0 10px 22px -8px rgba(102,54,201,0.55);
+    transition: transform 0.15s ease;
+  }
+
+  .tick-btn:hover{ transform: scale(1.08); }
+  .tick-btn:active{ transform: scale(0.95); }
+
+  .tick-btn svg{
+    width: 22px;
+    height: 22px;
+  }
+
+  /* ---------------- Open effects: corner poppers + pop ---------------- */
+  .effect-layer{
+    position:fixed;
+    inset:0;
+    pointer-events:none;
+    z-index:1200;
+    overflow:hidden;
+  }
+
+  .confetti-piece{
+    position:absolute;
+    will-change: transform, opacity;
+  }
+
+  @keyframes cellPop{
+    0%{ transform: scale(1); }
+    40%{ transform: scale(1.14); }
+    70%{ transform: scale(0.96); }
+    100%{ transform: scale(1); }
+  }
+
+  .cell.pop{
+    animation: cellPop 0.45s cubic-bezier(.34,1.56,.64,1);
+  }
+
+  .card.pop .face-back::after{
+    content:"";
+    position:absolute;
+    inset:0;
+    border-radius:var(--radius-card);
+    pointer-events:none;
+    opacity:0;
+    animation: backGlow 0.65s ease-out forwards;
+  }
+
+  @keyframes backGlow{
+    0%{ box-shadow: inset 0 0 0 4px rgba(255,255,255,0.9); opacity:0.9; }
+    100%{ box-shadow: inset 0 0 0 4px rgba(255,255,255,0); opacity:0; }
+  }
+
+</style>
+</head>
+<body>
+
+<!-- ===================== LOADING SCREEN ===================== -->
+<div class="loader" id="loader">
+  <div class="loader-inner">
+    <div class="loader-brand">Image Picker</div>
+    <div class="loader-reel">
+      <div class="loader-slot" id="loaderSlot">--</div>
+    </div>
+    <div class="loader-bar">
+      <div class="loader-barfill"></div>
+    </div>
+    <div class="loader-tag">Picking a spot…</div>
+  </div>
+</div>
+
+<!-- ===================== SETUP SCREEN ===================== -->
+<section id="setupScreen" class="screen active">
+  <div class="landing">
+
+    <div class="landing-card info-card">
+      <h1 class="app-title">Image Picker</h1>
+      <p class="info-sub">A lively random picker that turns any list of students, participants or names into a suspenseful board game.</p>
+
+      <h2 class="info-heading">About this project</h2>
+      <p class="about-text">A single HTML file &mdash; no server, no sign-up, works offline in any browser. Photos and names are saved on the device itself, so the board stays ready between sessions and resume works instantly.</p>
+      <ul class="uses">
+        <li>Classrooms &amp; quizzes &mdash; pick students at random for answers or activities</li>
+        <li>Events &amp; lucky draws &mdash; run a dramatic reveal on any big screen</li>
+        <li>Interactive displays &amp; kiosks &mdash; touch-friendly, perfect for exhibitions and stalls</li>
+        <li>Offers, contests &amp; activities &mdash; team selection, spot prizes, on-the-spot challenges</li>
+      </ul>
+
+      <h2 class="info-heading">How to work</h2>
+      <ol class="steps">
+        <li><b>Set up the board</b> &mdash; choose how many students and what each card shows (image, name, or both).</li>
+        <li>Add your students on the next screen &mdash; upload photos in bulk or load names from a CSV file.</li>
+        <li>Press <b>Random Pick</b> and watch the suspense unfold while the spinner runs.</li>
+        <li>Whichever number stops is revealed &mdash; and remembered for the next round.</li>
+      </ol>
+
+      <div class="dev-info">
+        <span class="dev-label">Developer</span>
+        <a class="dev-mail" href="mailto:sufyannajeeb786@gmail.com">sufyannajeeb786@gmail.com</a>
+      </div>
+    </div>
+
+    <div class="setup-card">
+      <h1>Set up the board</h1>
+      <p class="sub">Configure once, then start picking random students.</p>
+
+      <div class="field-label">Number of students</div>
+      <input class="num-input" id="numInput" type="number" inputmode="numeric" min="1" max="60" value="30">
+      <p class="hint">Enter any number from 1 to 60. Maximum is 60.</p>
+
+      <div class="field-label">What should each card show?</div>
+      <div class="mode-options">
+        <button class="mode-option" data-mode="textimage">
+          Image with Text
+          <small>Upload a photo and type the name</small>
+        </button>
+        <button class="mode-option" data-mode="image">
+          Image only
+          <small>Upload a photo for each student</small>
+        </button>
+        <button class="mode-option" data-mode="text">
+          Text only
+          <small>Upload names via CSV or type them</small>
+        </button>
+      </div>
+
+      <button class="setup-btn" id="setupBtn">Continue</button>
+    </div>
+
+  </div>
+</section>
+
+<!-- ===================== ENTRY SCREEN ===================== -->
+<section id="entryScreen" class="screen scroll">
+  <div class="entry-head">
+    <button class="ghost-btn" id="backBtn">&larr; Back</button>
+    <span class="entry-title" id="entryTitle">Enter details</span>
+    <button class="spin-btn" id="startBtn">Start picking</button>
+  </div>
+  <div class="bulk-bar" id="bulkBar" hidden>
+    <div>
+      <div class="bulk-title">Bulk upload photos</div>
+      <div class="bulk-sub" id="bulkStatus">Select all student photos at once &mdash; they get assigned randomly. Duplicate photos are not allowed.</div>
+    </div>
+    <div class="bulk-actions">
+      <label class="ghost-btn bulk-file-btn">Choose photos<input type="file" id="bulkInput" accept="image/*" multiple hidden></label>
+      <button class="ghost-btn" id="shuffleBtn">Shuffle images</button>
+    </div>
+  </div>
+  <div class="bulk-bar" id="csvBar" hidden>
+    <div>
+      <div class="bulk-title">Upload names from CSV</div>
+      <div class="bulk-sub" id="csvStatus">Upload a CSV file with one name per row &mdash; names are filled onto the cards in order.</div>
+    </div>
+    <div class="bulk-actions">
+      <label class="ghost-btn bulk-file-btn">Choose CSV<input type="file" id="csvInput" accept=".csv,text/csv" hidden></label>
+    </div>
+  </div>
+  <div class="entry-grid" id="entryGrid"></div>
+</section>
+
+<!-- ===================== GAME SCREEN ===================== -->
+<section id="gameScreen" class="screen">
+  <header>
+    <h1>Pick Any number</h1>
+    <div class="progress-row">
+      <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+      <div class="progress-label" id="progressLabel">0 / 0 revealed</div>
+    </div>
+  </header>
+
+  <div class="board" id="board"></div>
+
+  <footer>
+    <div class="footer-row">
+      <button class="spin-btn" id="spinBtn">
+        <span class="spin-icon">🎲</span> Random Pick
+      </button>
+      <button class="reset-btn" id="spinImgBtn">Spin shows photos: ON</button>
+      <button class="reset-btn" id="resetBtn">Reset all cards</button>
+      <button class="reset-btn" id="newSetupBtn">New setup</button>
+    </div>
+  </footer>
+</section>
+
+<!-- Enlarged reveal overlay -->
+<div class="effect-layer" id="effectLayer"></div>
+<div class="overlay" id="overlay">
+  <div class="overlay-card">
+    <div class="overlay-inner">
+      <div class="overlay-photo-wrap" id="overlayPhotoWrap"></div>
+      <div class="overlay-name" id="overlayName"></div>
+      <button class="tick-btn" id="tickBtn" aria-label="Close">
+        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M4 12.5L9.5 18L20 6" stroke="white" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Spin wheel (slot reel) overlay -->
+<div class="spin-overlay" id="spinOverlay">
+  <div class="spin-modal">
+    <div class="spin-window">
+      <div class="spin-fade top"></div>
+      <div class="spin-marker"></div>
+      <div class="spin-reel" id="spinReel"></div>
+      <div class="spin-fade bottom"></div>
+    </div>
+    <div class="spin-modal-title" id="spinModalTitle">Picking a number&hellip;</div>
+  </div>
+</div>
+
+<script>
+  // ---------------------------------------------------------------
+  // Loader: themed slot-reel splash while the app settles in.
+  const loader = document.getElementById("loader");
+  const loaderSlot = document.getElementById("loaderSlot");
+
+  let loaderTimer = null;
+  if(loaderSlot){
+    let n = 0;
+    loaderTimer = setInterval(() => {
+      n = (n + 13) % 100;
+      loaderSlot.textContent = String(n).padStart(2, "0");
+    }, 40);
+  }
+
+  const loaderStart = Date.now();
+  let loaderDone = false;
+  function finishLoader(){
+    if(loaderDone) return;
+    loaderDone = true;
+    const wait = Math.max(0, 700 - (Date.now() - loaderStart));
+    setTimeout(() => {
+      if(loaderTimer) clearInterval(loaderTimer);
+      if(loader){
+        loader.classList.add("hide");
+        setTimeout(() => { if(loader.parentNode) loader.remove(); }, 550);
+      }
+    }, wait);
+  }
+  window.addEventListener("load", finishLoader);
+  setTimeout(finishLoader, 4000);
+
+  // ---------------------------------------------------------------
+  // Setup / data model — no hardcoded student list.
+  const MAX_STUDENTS = 60;
+  const SETUP_KEY = "pickNumberSetup";
+
+  let students = {};   // { 1: { name, photo }, 2: { name, photo }, ... }
+  let mode = "textimage"; // "text" | "image" | "textimage"
+  let count = 0;
+
+  const setupScreen = document.getElementById("setupScreen");
+  const entryScreen = document.getElementById("entryScreen");
+  const gameScreen = document.getElementById("gameScreen");
+
+  const numInput = document.getElementById("numInput");
+  const modeBtns = Array.from(document.querySelectorAll(".mode-option"));
+  const setupBtn = document.getElementById("setupBtn");
+  const entryTitle = document.getElementById("entryTitle");
+  const entryGrid = document.getElementById("entryGrid");
+  const backBtn = document.getElementById("backBtn");
+  const startBtn = document.getElementById("startBtn");
+  const newSetupBtn = document.getElementById("newSetupBtn");
+  const bulkBar = document.getElementById("bulkBar");
+  const bulkInput = document.getElementById("bulkInput");
+  const bulkStatus = document.getElementById("bulkStatus");
+  const shuffleBtn = document.getElementById("shuffleBtn");
+  const csvBar = document.getElementById("csvBar");
+  const csvInput = document.getElementById("csvInput");
+  const csvStatus = document.getElementById("csvStatus");
+  const spinImgBtn = document.getElementById("spinImgBtn");
+
+  const SPIN_PHOTOS_KEY = "pickNumberSpinPhotos";
+  let spinShowPhotos = true;
+  try{ spinShowPhotos = localStorage.getItem(SPIN_PHOTOS_KEY) !== "0"; }catch(e){}
+
+  let photoPool = [];
+  let slotRefs = {};
+
+  function refreshSpinImgBtn(){
+    if(spinImgBtn) spinImgBtn.textContent = `Spin shows photos: ${spinShowPhotos ? "ON" : "OFF"}`;
+  }
+  refreshSpinImgBtn();
+
+  if(spinImgBtn){
+    spinImgBtn.addEventListener("click", () => {
+      spinShowPhotos = !spinShowPhotos;
+      try{ localStorage.setItem(SPIN_PHOTOS_KEY, spinShowPhotos ? "1" : "0"); }catch(e){}
+      refreshSpinImgBtn();
+    });
+  }
+
+  // ---------------- IndexedDB persistence (photos can be large) ----------------
+  const DB_NAME = "pickNumberDB";
+  const DB_STORE = "kv";
+
+  function idbOpen(){
+    return new Promise((resolve, reject) => {
+      if(!window.indexedDB){ reject(new Error("no-idb")); return; }
+      const req = indexedDB.open(DB_NAME, 1);
+      req.onupgradeneeded = () => req.result.createObjectStore(DB_STORE);
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+  }
+
+  function idbSet(key, value){
+    return idbOpen().then(db => new Promise((res, rej) => {
+      const tx = db.transaction(DB_STORE, "readwrite");
+      tx.objectStore(DB_STORE).put(value, key);
+      tx.oncomplete = () => res();
+      tx.onerror = () => rej(tx.error);
+    }));
+  }
+
+  function idbGet(key){
+    return idbOpen().then(db => new Promise((res, rej) => {
+      const tx = db.transaction(DB_STORE, "readonly");
+      const rq = tx.objectStore(DB_STORE).get(key);
+      rq.onsuccess = () => res(rq.result);
+      rq.onerror = () => rej(rq.error);
+    }));
+  }
+
+  function idbDel(key){
+    return idbOpen().then(db => new Promise((res, rej) => {
+      const tx = db.transaction(DB_STORE, "readwrite");
+      tx.objectStore(DB_STORE).delete(key);
+      tx.oncomplete = () => res();
+      tx.onerror = () => rej(tx.error);
+    }));
+  }
+
+  // ---------------- Screen switching ----------------
+  function showScreen(id){
+    [setupScreen, entryScreen, gameScreen].forEach(s => s.classList.remove("active"));
+    document.getElementById(id).classList.add("active");
+    if(id === "setupScreen") requestAnimationFrame(fitLanding);
+  }
+
+  function fitLanding(){
+    const wrap = document.querySelector(".landing");
+    if(!wrap || !setupScreen.classList.contains("active")) return;
+    const bs = getComputedStyle(document.body);
+    const avail = document.documentElement.clientHeight - parseFloat(bs.paddingTop || 0) - parseFloat(bs.paddingBottom || 0);
+    const h = wrap.offsetHeight || 1;
+    const s = Math.max(0.35, Math.min(1, (avail - 4) / h));
+    wrap.style.transform = `scale(${s})`;
+  }
+
+  window.addEventListener("resize", fitLanding);
+  if(document.fonts && document.fonts.ready) document.fonts.ready.then(fitLanding);
+
+  // ---------------- Mode selection ----------------
+  function selectMode(m){
+    mode = m;
+    modeBtns.forEach(b => b.classList.toggle("selected", b.dataset.mode === m));
+  }
+
+  modeBtns.forEach(b => b.addEventListener("click", () => selectMode(b.dataset.mode)));
+
+  // ---------------- Entry screen ----------------
+  function buildEntry(){
+    entryGrid.innerHTML = "";
+    students = {};
+    photoPool = [];
+    slotRefs = {};
+    entryTitle.textContent = `Enter ${count} student${count > 1 ? "s" : ""}`;
+    bulkBar.hidden = mode !== "image";
+    csvBar.hidden = mode !== "text";
+
+    for(let n = 1; n <= count; n++){
+      students[n] = { name: "", photo: "" };
+
+      const slot = document.createElement("div");
+      slot.className = "entry-slot";
+
+      const num = document.createElement("div");
+      num.className = "entry-num";
+      num.textContent = n;
+      slot.appendChild(num);
+
+      if(mode !== "text"){
+        const label = document.createElement("label");
+        label.className = "entry-photo";
+
+        const input = document.createElement("input");
+        input.type = "file";
+        input.accept = "image/*";
+        input.dataset.num = n;
+        input.hidden = true;
+
+        const box = document.createElement("div");
+        box.className = "entry-photo-box";
+        box.innerHTML = '<span class="entry-photo-placeholder">Choose photo</span><img class="entry-photo-preview" alt="" hidden>';
+
+        slotRefs[n] = { box, input };
+
+        input.addEventListener("change", () => {
+          const file = input.files && input.files[0];
+          if(!file) return;
+          const reader = new FileReader();
+          reader.onload = () => {
+            const src = reader.result;
+            const used = usedPhotoSet(n);
+            if(used.has(src)){
+              alert("This photo is already uploaded (duplicate). Please choose a different photo.");
+              input.value = "";
+              return;
+            }
+            students[n].photo = src;
+            updateSlotPreview(n, src);
+            refreshBulkStatus();
+          };
+          reader.readAsDataURL(file);
+        });
+
+        label.appendChild(input);
+        label.appendChild(box);
+        slot.appendChild(label);
+      }
+
+      if(mode !== "image"){
+        const nameInput = document.createElement("input");
+        nameInput.type = "text";
+        nameInput.className = "entry-name";
+        nameInput.dataset.num = n;
+        nameInput.placeholder = `Student ${n} name`;
+        nameInput.maxLength = 40;
+        nameInput.addEventListener("input", () => { students[n].name = nameInput.value; });
+        slot.appendChild(nameInput);
+        if(mode === "text"){
+          if(slotRefs[n]) slotRefs[n].nameInput = nameInput;
+          else slotRefs[n] = { nameInput };
+        }
+      }
+
+      entryGrid.appendChild(slot);
+    }
+
+    refreshBulkStatus();
+  }
+
+  function updateSlotPreview(n, src){
+    const ref = slotRefs[n];
+    if(!ref) return;
+    const prev = ref.box.querySelector(".entry-photo-preview");
+    prev.src = src;
+    prev.hidden = false;
+    const ph = ref.box.querySelector(".entry-photo-placeholder");
+    if(ph) ph.hidden = true;
+  }
+
+  function shuffleInPlace(a){
+    for(let i = a.length - 1; i > 0; i--){
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  }
+
+  function usedPhotoSet(exceptN){
+    const used = new Set(photoPool);
+    Object.keys(students).forEach(n => {
+      if(n !== String(exceptN) && students[n].photo) used.add(students[n].photo);
+    });
+    return used;
+  }
+
+  function refreshBulkStatus(){
+    if(!bulkStatus) return;
+    const filled = Object.keys(students).filter(n => students[n].photo).length;
+    if(mode === "image"){
+      bulkStatus.textContent = `${photoPool.length} photo${photoPool.length === 1 ? "" : "s"} uploaded · ${filled} of ${count} slots filled`;
+    } else {
+      bulkStatus.textContent = `${filled} of ${count} photos added`;
+    }
+  }
+
+  function allocatePhotos(){
+    const slots = shuffleInPlace(Array.from({ length: count }, (_, i) => i + 1));
+    const pool = shuffleInPlace(photoPool.slice());
+    for(let i = 0; i < slots.length && i < pool.length; i++){
+      students[slots[i]].photo = pool[i];
+      updateSlotPreview(slots[i], pool[i]);
+    }
+    refreshBulkStatus();
+  }
+
+  bulkInput.addEventListener("change", () => {
+    const files = bulkInput.files ? Array.from(bulkInput.files) : [];
+    if(!files.length) return;
+    let pending = files.length;
+    let dupes = 0;
+    files.forEach(file => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const src = reader.result;
+        if(usedPhotoSet().has(src)){
+          dupes++;
+        } else {
+          photoPool.push(src);
+        }
+        if(--pending === 0){
+          if(dupes) alert(`${dupes} duplicate photo${dupes > 1 ? "s" : ""} skipped. Duplicate images are not allowed.`);
+          allocatePhotos();
+          bulkInput.value = "";
+        }
+      };
+      reader.onerror = () => { if(--pending === 0){ bulkInput.value = ""; } };
+      reader.readAsDataURL(file);
+    });
+  });
+
+  shuffleBtn.addEventListener("click", () => {
+    Object.keys(students).forEach(n => {
+      if(students[n].photo) photoPool.push(students[n].photo);
+    });
+    photoPool = Array.from(new Set(photoPool));
+    allocatePhotos();
+  });
+
+  function parseNamesFromCSV(text){
+    const lines = String(text).split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+    const headerWords = ["name", "names", "student", "students", "studentname", "fullname", "studentname", "rollno", "rollnumber", "sno", "serialno", "no"];
+    const names = [];
+    for(let i = 0; i < lines.length; i++){
+      const raw = lines[i];
+      let cells = raw.split(",");
+      if(cells.length === 1){
+        cells = [raw.replace(/^"|"$/g, ""), ""];
+      }
+      cells = cells.map(c => c.replace(/^"+|"+$/g, "").trim());
+      let name = cells[0] || "";
+      if(!name && cells[1]) name = cells[1];
+      if(/^\d+$/.test(name) && cells[1]) name = cells[1];
+      if(!name) continue;
+      if(i === 0 && headerWords.includes(name.toLowerCase().replace(/[^a-z]/g, ""))) continue;
+      names.push(name);
+    }
+    return names;
+  }
+
+  function refreshCsvStatus(){
+    if(!csvStatus) return;
+    const filled = Object.keys(students).filter(n => students[n].name).length;
+    csvStatus.textContent = `Names added to ${filled} of ${count} cards`;
+  }
+
+  csvInput.addEventListener("change", () => {
+    const file = csvInput.files && csvInput.files[0];
+    if(!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const names = parseNamesFromCSV(reader.result);
+      if(!names.length){
+        alert("No names were found in the CSV file. Make sure there is one name per row.");
+        csvInput.value = "";
+        return;
+      }
+      let filled = 0;
+      for(let n = 1; n <= count && names.length; n++){
+        const name = names.shift();
+        students[n].name = name;
+        const ref = slotRefs[n];
+        if(ref && ref.nameInput) ref.nameInput.value = name;
+        filled++;
+      }
+      if(names.length) alert(`The CSV has more names (${names.length + filled}) than the ${count} cards. Extra names were ignored.`);
+      refreshCsvStatus();
+      csvInput.value = "";
+    };
+    reader.readAsText(file);
+  });
+
+  setupBtn.addEventListener("click", () => {
+    let n = parseInt(numInput.value, 10);
+    if(!Number.isFinite(n) || n < 1){ n = 1; numInput.value = 1; }
+    if(n > MAX_STUDENTS){
+      alert(`Maximum number of students is ${MAX_STUDENTS}.`);
+      numInput.value = MAX_STUDENTS;
+      return;
+    }
+    count = n;
+    buildEntry();
+    showScreen("entryScreen");
+  });
+
+  numInput.addEventListener("keydown", (e) => { if(e.key === "Enter") setupBtn.click(); });
+  numInput.addEventListener("input", () => {
+    const v = parseInt(numInput.value, 10);
+    if(Number.isFinite(v) && v > MAX_STUDENTS) numInput.value = MAX_STUDENTS;
+  });
+
+  backBtn.addEventListener("click", () => showScreen("setupScreen"));
+
+  startBtn.addEventListener("click", async () => {
+    const missing = [];
+    for(let n = 1; n <= count; n++){
+      if(mode !== "image" && !students[n].name.replace(/\s/g, "")) missing.push(n);
+      if(mode !== "text" && !students[n].photo) missing.push(n);
+    }
+    if(missing.length){
+      alert(`Please complete the missing entries: ${missing.join(", ")}`);
+      return;
+    }
+    for(let n = 1; n <= count; n++){
+      students[n].name = students[n].name.trim() || `Student ${n}`;
+    }
+    saveSetup();
+    try{ await idbSet("students", students); }catch(e){}
+    try{ localStorage.removeItem(REVEALED_KEY); }catch(e){}
+    revealed = {};
+    showScreen("gameScreen");
+    render();
+  });
+
+  async function clearConfig(){
+    try{ localStorage.removeItem(SETUP_KEY); }catch(e){}
+    try{ localStorage.removeItem(REVEALED_KEY); }catch(e){}
+    try{ await idbDel("students"); }catch(e){}
+    students = {};
+    count = 0;
+  }
+
+  newSetupBtn.addEventListener("click", () => {
+    const prev = { count, mode };
+    const ok = window.confirm("Start a new setup? The current student list and photos will be removed.");
+    if(!ok) return;
+    clearConfig().then(() => {
+      numInput.value = prev.count || 30;
+      selectMode(prev.mode);
+      revealed = {};
+      showScreen("setupScreen");
+    });
+  });
+
+  function saveSetup(){
+    try{ localStorage.setItem(SETUP_KEY, JSON.stringify({ count, mode })); }catch(e){}
+  }
+
+  // ---------------------------------------------------------------
+  // Game logic
+  const REVEALED_KEY = "pickNumberRevealedState";
+
+  const board = document.getElementById("board");
+  const progressFill = document.getElementById("progressFill");
+  const progressLabel = document.getElementById("progressLabel");
+  const resetBtn = document.getElementById("resetBtn");
+  const spinBtn = document.getElementById("spinBtn");
+  const spinOverlay = document.getElementById("spinOverlay");
+  const spinReel = document.getElementById("spinReel");
+  const spinModalTitle = document.getElementById("spinModalTitle");
+  let cardsByNumber = {};
+
+  const overlay = document.getElementById("overlay");
+  const overlayPhotoWrap = document.getElementById("overlayPhotoWrap");
+  const tickBtn = document.getElementById("tickBtn");
+
+  function loadRevealed(){
+    try{
+      return JSON.parse(localStorage.getItem(REVEALED_KEY)) || {};
+    }catch(e){ return {}; }
+  }
+
+  function saveRevealed(state){
+    try{ localStorage.setItem(REVEALED_KEY, JSON.stringify(state)); }
+    catch(e){ /* storage unavailable — reveals just won't persist on reload */ }
+  }
+
+  let revealed = loadRevealed();
+
+  function initials(name){
+    return name.trim().split(/\s+/).map(w => w[0]).join("").slice(0,2).toUpperCase();
+  }
+
+  // ---------------- Open effects: handclap sound + DJ reveal ----------------
+  const REDUCED_MOTION = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  let audioCtx = null;
+  function getAudioCtx(){
+    if(!audioCtx){
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if(AC) audioCtx = new AC();
+    }
+    return audioCtx;
+  }
+
+  function playClap(){
+    try{
+      const ctx = getAudioCtx();
+      if(!ctx) return;
+      if(ctx.state === "suspended") ctx.resume();
+      const t = ctx.currentTime;
+      const dur = 0.25;
+      const buffer = ctx.createBuffer(1, Math.floor(ctx.sampleRate * dur), ctx.sampleRate);
+      const ch = buffer.getChannelData(0);
+      for(let i = 0; i < ch.length; i++) ch[i] = Math.random() * 2 - 1;
+
+      // layered noise bursts = handclap smack
+      const hits = [
+        { at: 0,     vol: 0.25, dur: 0.04 },
+        { at: 0.012, vol: 0.30, dur: 0.05 },
+        { at: 0.03,  vol: 0.90, dur: 0.12 }
+      ];
+      hits.forEach(h => {
+        const src = ctx.createBufferSource();
+        src.buffer = buffer;
+        const bp = ctx.createBiquadFilter();
+        bp.type = "bandpass";
+        bp.frequency.value = 1400;
+        bp.Q.value = 1.2;
+        const g = ctx.createGain();
+        const st = t + h.at;
+        g.gain.setValueAtTime(0.0001, st);
+        g.gain.exponentialRampToValueAtTime(h.vol, st + 0.004);
+        g.gain.exponentialRampToValueAtTime(0.0001, st + h.dur);
+        src.connect(bp).connect(g).connect(ctx.destination);
+        src.start(st);
+        src.stop(st + h.dur + 0.02);
+      });
+    }catch(e){}
+  }
+
+  function playPopper(){
+    try{
+      const ctx = getAudioCtx();
+      if(!ctx) return;
+      const t = ctx.currentTime;
+      const dur = 0.3;
+      const buffer = ctx.createBuffer(1, Math.floor(ctx.sampleRate * dur), ctx.sampleRate);
+      const ch = buffer.getChannelData(0);
+      for(let i = 0; i < ch.length; i++) ch[i] = Math.random() * 2 - 1;
+
+      // whoosh burst (confetti shooting out)
+      const n1 = ctx.createBufferSource();
+      n1.buffer = buffer;
+      const lp = ctx.createBiquadFilter();
+      lp.type = "lowpass";
+      lp.frequency.setValueAtTime(300, t);
+      lp.frequency.exponentialRampToValueAtTime(2500, t + 0.18);
+      const g1 = ctx.createGain();
+      g1.gain.setValueAtTime(0.0001, t);
+      g1.gain.exponentialRampToValueAtTime(0.25, t + 0.08);
+      g1.gain.exponentialRampToValueAtTime(0.001, t + 0.22);
+      n1.connect(lp).connect(g1).connect(ctx.destination);
+      n1.start(t);
+      n1.stop(t + 0.3);
+
+      // bright pop snap
+      const n2 = ctx.createBufferSource();
+      n2.buffer = buffer;
+      const bp = ctx.createBiquadFilter();
+      bp.type = "bandpass";
+      bp.frequency.setValueAtTime(400, t + 0.18);
+      bp.frequency.exponentialRampToValueAtTime(2000, t + 0.24);
+      bp.Q.value = 1.5;
+      const g2 = ctx.createGain();
+      g2.gain.setValueAtTime(0.0001, t + 0.18);
+      g2.gain.exponentialRampToValueAtTime(0.7, t + 0.2);
+      g2.gain.exponentialRampToValueAtTime(0.001, t + 0.3);
+      n2.connect(bp).connect(g2).connect(ctx.destination);
+      n2.start(t + 0.18);
+      n2.stop(t + 0.64);
+
+      // low "boing" body
+      const osc = ctx.createOscillator();
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(160, t + 0.18);
+      osc.frequency.exponentialRampToValueAtTime(70, t + 0.28);
+      const g3 = ctx.createGain();
+      g3.gain.setValueAtTime(0.0001, t + 0.18);
+      g3.gain.exponentialRampToValueAtTime(0.5, t + 0.2);
+      g3.gain.exponentialRampToValueAtTime(0.001, t + 0.3);
+      osc.connect(g3).connect(ctx.destination);
+      osc.start(t + 0.18);
+      osc.stop(t + 0.32);
+    }catch(e){}
+  }
+
+  function playTick(){
+    try{
+      const ctx = getAudioCtx();
+      if(!ctx) return;
+      const t = ctx.currentTime;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(660, t);
+      osc.frequency.exponentialRampToValueAtTime(500, t + 0.08);
+      gain.gain.setValueAtTime(0.3, t);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.1);
+      osc.connect(gain).connect(ctx.destination);
+      osc.start(t);
+      osc.stop(t + 0.12);
+    }catch(e){}
+  }
+
+  /* ---------------- Spinning wheel sound ---------------- */
+  // Solves the same cubic-bezier the reel uses, so the ticks line up with
+  // the numbers actually passing the marker.
+  function bezierX(t, x1, x2){
+    const u = 1 - t;
+    return 3*u*u*t*x1 + 3*u*t*t*x2 + t*t*t;
+  }
+  function bezierY(t, y1, y2){
+    const u = 1 - t;
+    return 3*u*u*t*y1 + 3*u*t*t*y2 + t*t*t;
+  }
+  // given a progress value (0..1), find the time fraction that produces it
+  function solveSpinTime(progress){
+    const x1 = 0.09, y1 = 0.72, x2 = 0.12, y2 = 1;
+    let lo = 0, hi = 1, mid = 0.5;
+    for(let i = 0; i < 24; i++){
+      mid = (lo + hi) / 2;
+      if(bezierY(mid, y1, y2) < progress) lo = mid; else hi = mid;
+    }
+    return bezierX(mid, x1, x2);
+  }
+
+  let spinNodes = [];
+
+  function stopSpinSound(){
+    spinNodes.forEach(n => { try{ n.stop(); }catch(e){} });
+    spinNodes = [];
+  }
+
+  function playSpinSound(itemCount, durationSec){
+    try{
+      const ctx = getAudioCtx();
+      if(!ctx) return;
+      if(ctx.state === "suspended") ctx.resume();
+      stopSpinSound();
+      const t0 = ctx.currentTime;
+
+      // 1) Low whirring motor underneath the whole spin
+      const whirDur = durationSec + 0.15;
+      const nBuf = ctx.createBuffer(1, Math.floor(ctx.sampleRate * whirDur), ctx.sampleRate);
+      const nCh = nBuf.getChannelData(0);
+      for(let i = 0; i < nCh.length; i++) nCh[i] = Math.random() * 2 - 1;
+
+      const whir = ctx.createBufferSource();
+      whir.buffer = nBuf;
+      const whirFilt = ctx.createBiquadFilter();
+      whirFilt.type = "bandpass";
+      whirFilt.Q.value = 1.2;
+      whirFilt.frequency.setValueAtTime(900, t0);
+      whirFilt.frequency.linearRampToValueAtTime(180, t0 + durationSec);
+      const whirGain = ctx.createGain();
+      whirGain.gain.setValueAtTime(0.0001, t0);
+      whirGain.gain.exponentialRampToValueAtTime(0.09, t0 + 0.12);
+      whirGain.gain.setValueAtTime(0.09, t0 + durationSec * 0.6);
+      whirGain.gain.exponentialRampToValueAtTime(0.0001, t0 + durationSec);
+      whir.connect(whirFilt).connect(whirGain).connect(ctx.destination);
+      whir.start(t0);
+      whir.stop(t0 + whirDur);
+      spinNodes.push(whir);
+
+      // 2) Ratchet ticks — one per number crossing the marker, so they
+      //    naturally slow down as the reel eases to a stop.
+      const MIN_GAP = 0.035;   // don't machine-gun at the start
+      const MAX_TICKS = 70;
+      let lastAt = -1;
+      const times = [];
+      for(let k = 1; k <= itemCount; k++){
+        const at = solveSpinTime(k / itemCount) * durationSec;
+        if(at - lastAt < MIN_GAP) continue;
+        lastAt = at;
+        times.push(at);
+      }
+      // keep only the tail if there are too many
+      const useTimes = times.length > MAX_TICKS ? times.slice(times.length - MAX_TICKS) : times;
+
+      useTimes.forEach((at, i) => {
+        const when = t0 + at;
+        const remaining = 1 - (at / durationSec);
+        // later ticks get a touch lower + louder = "clack, clack... clack"
+        const freq = 1500 + remaining * 900;
+        const vol = 0.10 + (1 - remaining) * 0.22;
+
+        const src = ctx.createBufferSource();
+        src.buffer = nBuf;
+        const bp = ctx.createBiquadFilter();
+        bp.type = "bandpass";
+        bp.frequency.value = freq;
+        bp.Q.value = 6;
+        const g = ctx.createGain();
+        g.gain.setValueAtTime(0.0001, when);
+        g.gain.exponentialRampToValueAtTime(vol, when + 0.003);
+        g.gain.exponentialRampToValueAtTime(0.0001, when + 0.045);
+        src.connect(bp).connect(g).connect(ctx.destination);
+        src.start(when);
+        src.stop(when + 0.06);
+        spinNodes.push(src);
+      });
+    }catch(e){}
+  }
+
+  // little rising "ta-da" for the winner landing
+  function playWinnerChime(){
+    try{
+      const ctx = getAudioCtx();
+      if(!ctx) return;
+      const t = ctx.currentTime;
+      [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => {
+        const osc = ctx.createOscillator();
+        const g = ctx.createGain();
+        osc.type = "triangle";
+        osc.frequency.setValueAtTime(f, t + i * 0.09);
+        g.gain.setValueAtTime(0.0001, t + i * 0.09);
+        g.gain.exponentialRampToValueAtTime(0.28, t + i * 0.09 + 0.02);
+        g.gain.exponentialRampToValueAtTime(0.001, t + i * 0.09 + 0.35);
+        osc.connect(g).connect(ctx.destination);
+        osc.start(t + i * 0.09);
+        osc.stop(t + i * 0.09 + 0.4);
+      });
+    }catch(e){}
+  }
+
+  function cornerPoppers(){
+    if(REDUCED_MOTION) return;
+    const layer = document.getElementById("effectLayer");
+    if(!layer) return;
+    const W = window.innerWidth;
+    const H = window.innerHeight;
+    const corners = [[0,0],[W,0],[W,H],[0,H]];
+    corners.forEach(([cx,cy], i) => {
+      setTimeout(() => cornerConfettiAt(cx, cy), i * 70);
+    });
+  }
+
+  function cornerConfettiAt(cx, cy){
+    const layer = document.getElementById("effectLayer");
+    if(!layer) return;
+    const W = window.innerWidth;
+    const H = window.innerHeight;
+    const colors = ["#7C4FE0","#6636C9","#FFC94D","#EF476F","#06D6A0","#FFFFFF"];
+    const count = 120;
+    for(let i = 0; i < count; i++){
+      const delay = Math.random() * 160;
+      setTimeout(() => {
+      const p = document.createElement("div");
+      p.className = "confetti-piece";
+      const size = 7 + Math.random() * 7;
+      const color = colors[Math.floor(Math.random() * colors.length)];
+      const round = Math.random() < 0.35 ? "border-radius:50%;" : "";
+      p.style.cssText = `left:${cx}px;top:${cy}px;width:${size}px;height:${size}px;background:${color};${round}`;
+      layer.appendChild(p);
+
+      // shoot toward the center then fall with gravity
+      const D = 1.5 + Math.random() * 0.6;
+      const g = (H * 2.8) / (D * D);
+      const angle = Math.atan2(H / 2 - cy, W / 2 - cx) + (Math.random() - 0.5) * 0.7;
+      const v0 = (W * 0.3 + Math.random() * W * 0.55) / D;
+      const vx = Math.cos(angle) * v0;
+      const vy = Math.sin(angle) * v0 - H * 0.08 / D;
+      const spin = (Math.random() * 2 - 1) * 600;
+      const N = 16;
+      const frames = [];
+      for(let k = 0; k <= N; k++){
+        const t = k / N;
+        const px = vx * D * t;
+        const py = vy * D * t + 0.5 * g * D * D * t * t;
+        const rot = spin * t;
+        const scale = t < 0.13 ? 1 + Math.sin(t / 0.13 * Math.PI) * 0.7 : 1;
+        const opacity = t > 0.72 ? Math.max(0, 1 - (t - 0.72) / 0.28) : 1;
+        frames.push({
+          transform: `translate(calc(-50% + ${px}px), calc(-50% + ${py}px)) rotate(${rot}deg) scale(${scale})`,
+          opacity
+        });
+      }
+      p.animate(frames, { duration: D * 1000, easing: "linear", fill: "forwards" })
+        .onfinish = () => p.remove();
+      }, delay);
+    }
+  }
+
+  function updateProgress(){
+    const total = Object.keys(students).length;
+    const done = Object.values(revealed).filter(Boolean).length;
+    progressFill.style.width = total ? (done/total*100) + "%" : "0%";
+    progressLabel.textContent = `${done} / ${total} revealed`;
+  }
+
+  function openOverlay(number, student){
+    overlayPhotoWrap.innerHTML = student.photo
+      ? `<img src="${student.photo}" alt="${student.name}">`
+      : `<div class="overlay-initials">${student.name}</div>`;
+    document.getElementById("overlayName").textContent = student.name;
+    overlay.classList.add("open");
+  }
+
+  function closeOverlay(){
+    overlay.classList.remove("open");
+    playTick();
+  }
+
+  tickBtn.addEventListener("click", closeOverlay);
+  overlay.addEventListener("click", (e) => {
+    if(e.target === overlay) closeOverlay();
+  });
+  document.addEventListener("keydown", (e) => {
+    if(e.key === "Escape") closeOverlay();
+  });
+
+  function buildCard(number, student){
+    const cell = document.createElement("div");
+    cell.className = "cell";
+
+    const card = document.createElement("div");
+    card.className = "card";
+    card.tabIndex = 0;
+    card.setAttribute("role", "button");
+    card.setAttribute("aria-label", `Number ${number}`);
+
+    const front = document.createElement("div");
+    front.className = "face face-front";
+    front.innerHTML = `<div class="num">${number}</div>`;
+
+    const back = document.createElement("div");
+    back.className = "face face-back";
+    const photoBlock = student.photo
+      ? `<img class="photo-fill" src="${student.photo}" alt="${student.name}">`
+      : `<div class="initials-fill">${initials(student.name)}</div>`;
+    back.innerHTML = photoBlock;
+
+    card.appendChild(front);
+    card.appendChild(back);
+    cell.appendChild(card);
+
+    function reveal(){
+      // one-way flip: card stays flipped forever once opened
+      if(!revealed[number]){
+        revealed[number] = true;
+        saveRevealed(revealed);
+        updateProgress();
+      }
+      card.classList.add("flipped");
+
+      // pop + corner poppers + party popper fire at the same time as the flip
+      const cell = card.parentElement;
+
+      cell.classList.remove("pop");
+      card.classList.remove("pop");
+      void cell.offsetWidth; // restart the animation
+      cell.classList.add("pop");
+      card.classList.add("pop");
+
+      playClap();
+      playPopper();
+      cornerPoppers();
+      openOverlay(number, student);
+    }
+
+    card.addEventListener("click", reveal);
+    card.addEventListener("keydown", (e) => {
+      if(e.key === "Enter" || e.key === " "){
+        e.preventDefault();
+        reveal();
+      }
+    });
+
+    if(revealed[number]){
+      card.classList.add("flipped");
+    }
+
+    cardsByNumber[number] = card;
+
+    return cell;
+  }
+
+  function render(){
+    board.innerHTML = "";
+    cardsByNumber = {};
+    Object.keys(students)
+      .map(Number)
+      .sort((a,b) => a-b)
+      .forEach(num => board.appendChild(buildCard(num, students[num])));
+    updateProgress();
+  }
+
+  resetBtn.addEventListener("click", () => {
+    const ok = window.confirm("Reset all cards? Every number will flip back to hidden.");
+    if(!ok) return;
+    revealed = {};
+    saveRevealed(revealed);
+    spinBtn.disabled = false;
+    spinBtn.innerHTML = '<span class="spin-icon">\uD83C\uDFB2</span> Random Pick';
+    render();
+  });
+
+  function shuffleArray(arr){
+    const a = arr.slice();
+    for(let i = a.length - 1; i > 0; i--){
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  }
+
+  const REEL_ITEM_HEIGHT = 76;
+
+  spinBtn.addEventListener("click", () => {
+    if(spinBtn.disabled) return;
+
+    const remaining = Object.keys(students)
+      .map(Number)
+      .filter(num => !revealed[num]);
+
+    if(remaining.length === 0){
+      spinBtn.disabled = true;
+      spinBtn.textContent = "All cards revealed!";
+      return;
+    }
+
+    spinBtn.disabled = true;
+
+    const winner = remaining[Math.floor(Math.random() * remaining.length)];
+
+    // Build a long sequence of shuffled remaining numbers so the reel has
+    // plenty to scroll through, ending on the winner.
+    let sequence = [];
+    const loops = remaining.length < 6 ? 8 : 5;
+    for(let i = 0; i < loops; i++){
+      sequence = sequence.concat(shuffleArray(remaining));
+    }
+    sequence = sequence.concat(shuffleArray(remaining.filter(n => n !== winner)));
+    sequence.push(winner);
+    const winnerIndex = sequence.length - 1;
+
+    // Render the reel
+    spinReel.style.transition = "none";
+    spinReel.style.transform = "translateY(0px)";
+    spinReel.innerHTML = "";
+    sequence.forEach(num => {
+      const item = document.createElement("div");
+      item.className = "spin-item";
+      const student = students[num];
+      if(spinShowPhotos && student && student.photo){
+        const img = document.createElement("img");
+        img.className = "spin-photo";
+        img.src = student.photo;
+        img.alt = "";
+        item.appendChild(img);
+        const span = document.createElement("span");
+        span.textContent = num;
+        item.appendChild(span);
+      } else if(spinShowPhotos && student && student.name){
+        const ini = document.createElement("span");
+        ini.className = "spin-initials";
+        ini.textContent = initials(student.name);
+        item.appendChild(ini);
+        const span = document.createElement("span");
+        span.textContent = num;
+        item.appendChild(span);
+      } else {
+        item.textContent = num;
+      }
+      spinReel.appendChild(item);
+    });
+
+    spinModalTitle.textContent = "Picking a number\u2026";
+    spinOverlay.classList.add("open");
+    playTick();
+
+    // Force reflow so the "none" transition actually takes effect before
+    // we animate to the final offset.
+    void spinReel.offsetHeight;
+
+    const SPIN_SECONDS = 3.4;
+
+    requestAnimationFrame(() => {
+      const finalOffset = -(winnerIndex - 1) * REEL_ITEM_HEIGHT;
+      spinReel.style.transition = `transform ${SPIN_SECONDS}s cubic-bezier(0.09, 0.72, 0.12, 1)`;
+      spinReel.style.transform = `translateY(${finalOffset}px)`;
+      // wheel sound, timed to the exact same easing curve
+      playSpinSound(Math.max(1, winnerIndex - 1), SPIN_SECONDS);
+    });
+
+    const onSpinEnd = () => {
+      spinReel.removeEventListener("transitionend", onSpinEnd);
+
+      stopSpinSound();
+
+      const winnerEl = spinReel.children[winnerIndex];
+      if(winnerEl) winnerEl.classList.add("winner");
+      spinModalTitle.textContent = "Got it!";
+      playWinnerChime();
+
+      setTimeout(() => {
+        spinOverlay.classList.remove("open");
+        spinBtn.disabled = false;
+
+        const card = cardsByNumber[winner];
+        if(card){
+          card.scrollIntoView({ behavior: "smooth", block: "center" });
+          setTimeout(() => card.click(), 350);
+        }
+      }, 750);
+    };
+    spinReel.addEventListener("transitionend", onSpinEnd);
+  });
+
+  // ---------------------------------------------------------------
+  // Boot: resume a saved setup if one exists, otherwise show setup.
+  async function initApp(){
+    selectMode("textimage");
+    try{
+      const saved = JSON.parse(localStorage.getItem(SETUP_KEY) || "null");
+      if(saved && ["text","image","textimage"].includes(saved.mode)
+          && saved.count >= 1 && saved.count <= MAX_STUDENTS){
+        const data = await idbGet("students");
+        if(data && Object.keys(data).length === saved.count){
+          students = data;
+          mode = saved.mode;
+          count = saved.count;
+          selectMode(mode);
+          revealed = loadRevealed();
+          showScreen("gameScreen");
+          render();
+          finishLoader();
+          return;
+        }
+      }
+    }catch(e){}
+    numInput.value = 30;
+    showScreen("setupScreen");
+    finishLoader();
+  }
+
+  initApp();
+</script>
+
+</body>
+</html>
