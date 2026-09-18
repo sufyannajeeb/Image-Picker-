@@ -1362,7 +1362,7 @@
     photoPool = [];
     slotRefs = {};
     entryTitle.textContent = `Enter ${count} student${count > 1 ? "s" : ""}`;
-    bulkBar.hidden = mode !== "image";
+    bulkBar.hidden = mode !== "image" && mode !== "textimage";
     csvBar.hidden = mode !== "text";
 
     for(let n = 1; n <= count; n++){
@@ -1466,11 +1466,7 @@
   function refreshBulkStatus(){
     if(!bulkStatus) return;
     const filled = Object.keys(students).filter(n => students[n].photo).length;
-    if(mode === "image"){
-      bulkStatus.textContent = `${photoPool.length} photo${photoPool.length === 1 ? "" : "s"} uploaded · ${filled} of ${count} slots filled`;
-    } else {
-      bulkStatus.textContent = `${filled} of ${count} photos added`;
-    }
+    bulkStatus.textContent = `${photoPool.length} photo${photoPool.length === 1 ? "" : "s"} uploaded · ${filled} of ${count} slots filled`;
   }
 
   function allocatePhotos(){
